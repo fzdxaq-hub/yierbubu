@@ -1,0 +1,17 @@
+:root {
+  --hdc-green-50: #f3fbf5;
+  --hdc-green-100: #e7f6eb;
+  --hdc-green-200: #c8ebd2;
+  --hdc-green-400: #67cd84;
+  --hdc-green-500: #37b35a;
+  --hdc-green-700: #2f7d46;
+  --hdc-orange-400: #ffb16a;
+  --hdc-danger-400: #ff8f84;
+  --hdc-danger-500: #ff7d73;
+  --hdc-page: #eff3ec;
+  --hdc-text: #1f2a1e;
+  --hdc-muted: #73806f;
+  --hdc-border: #e8eee7;
+  --hdc-panel: #ffffff;
+  --hdc-shadow-soft: 0 10px 28px rgba(49, 89, 55, 0.1);
+}

@@ -1,0 +1,16 @@
+node_modules
+.git
+.gitignore
+.DS_Store
+*.log
+coverage
+dist
+apps/*/dist
+packages/*/dist
+.turbo
+.pnpm-store
+.env
+apps/*/.env
+apps/*/.env.local
+apps/*/.env.development.local
+apps/*/.env.production.local

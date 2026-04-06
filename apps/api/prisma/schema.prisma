@@ -1,0 +1,166 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Shop {
+  id          String         @id @default(cuid())
+  name        String
+  subtitle    String
+  avatarLabel String
+  categories  MenuCategory[]
+  recipes     Recipe[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+}
+
+model User {
+  id               String   @id @default(cuid())
+  account          String   @unique
+  displayName      String
+  passwordHash     String
+  refreshTokenHash String?
+  role             UserRole @default(END_USER)
+  shopId           String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([role])
+  @@index([shopId])
+}
+
+model MenuCategory {
+  id         String         @id @default(cuid())
+  shopId     String
+  name       String
+  sortOrder  Int
+  status     CategoryStatus @default(ENABLED)
+  shop       Shop           @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  recipes    Recipe[]
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  @@index([shopId])
+}
+
+model Recipe {
+  id          String       @id @default(cuid())
+  shopId      String
+  categoryId  String
+  name        String
+  badge       String?
+  cover       String?
+  rating      Int          @default(5)
+  price       Int          @default(0)
+  sales       Int          @default(0)
+  stock       Int          @default(999)
+  isOnline    Boolean      @default(true)
+  tags        Json?
+  thumbTone   String       @default("#f8d59c")
+  thumbAccent String       @default("#d38852")
+  shop        Shop         @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  category    MenuCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([shopId])
+  @@index([categoryId])
+}
+
+model Cart {
+  id              String     @id @default(cuid())
+  userId          String     @unique
+  shopId          String?
+  lastOrderId     String?
+  lastSubmittedAt DateTime?
+  items           CartItem[]
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+}
+
+model CartItem {
+  id           String   @id @default(cuid())
+  cartId       String
+  productId    String
+  shopId       String
+  categoryId   String
+  categoryName String
+  name         String
+  badge        String?
+  price        Int
+  quantity     Int
+  stock        Int
+  status       String
+  thumbTone    String
+  thumbAccent  String
+  cart         Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([cartId])
+  @@unique([cartId, productId])
+}
+
+model Order {
+  id           String      @id @default(cuid())
+  orderNo      String      @unique
+  userId       String
+  shopId       String
+  shopName     String
+  status       OrderStatus @default(PENDING_PAYMENT)
+  itemCount    Int
+  totalQuantity Int
+  totalAmount  Int
+  paidAt       DateTime?
+  cancelledAt  DateTime?
+  completedAt  DateTime?
+  items        OrderItem[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([shopId])
+  @@index([status])
+}
+
+model OrderItem {
+  id           String   @id @default(cuid())
+  orderId       String
+  productId     String
+  categoryId    String
+  categoryName  String
+  name          String
+  badge         String?
+  price         Int
+  quantity      Int
+  lineAmount    Int
+  thumbTone     String
+  thumbAccent   String
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([orderId])
+}
+
+enum CategoryStatus {
+  ENABLED
+  DISABLED
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PAID
+  CANCELLED
+  COMPLETED
+}
+
+enum UserRole {
+  END_USER
+  MERCHANT_ADMIN
+  SUPER_ADMIN
+}
