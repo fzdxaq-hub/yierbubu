@@ -10,6 +10,6 @@ import { RolesGuard } from '../../common/auth/roles.guard'
   imports: [UsersModule],
   controllers: [AuthController],
   providers: [AuthService, TokenService, AuthGuard, RolesGuard],
-  exports: [AuthService, TokenService, AuthGuard, RolesGuard]
+  exports: [UsersModule, AuthService, TokenService, AuthGuard, RolesGuard]
 })
 export class AuthModule {}
