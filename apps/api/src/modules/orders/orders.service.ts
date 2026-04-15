@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
 import { orderStatusValues } from '@haodacai/shared'
 import type { AuthUser, OrderDetail, OrderItem, OrderStatus, OrderSummary } from '@haodacai/shared'
@@ -155,103 +156,117 @@ export class OrdersService {
   }
 
   async createOrder(currentUser: AuthUser): Promise<OrderDetail> {
-    const created = await this.prisma.$transaction(async (tx) => {
-      const cart = await tx.cart.findUnique({
-        where: {
-          userId: currentUser.id
-        },
-        include: {
-          items: true
+    const cart = await this.prisma.cart.findUnique({
+      where: {
+        userId: currentUser.id
+      },
+      include: {
+        items: {
+          orderBy: {
+            createdAt: 'asc'
+          }
         }
-      })
+      }
+    })
 
-      if (!cart || cart.items.length === 0) {
-        if (cart?.lastOrderId) {
-          throw new BadRequestException('订单已提交，请勿重复提交。')
-        }
-
-        throw new BadRequestException('购物车为空。')
+    if (!cart || cart.items.length === 0) {
+      if (cart?.lastOrderId) {
+        throw new BadRequestException('订单已提交，请勿重复提交。')
       }
 
-      const productIds = cart.items.map((item) => item.productId)
-      const products = await tx.recipe.findMany({
-        where: {
-          id: {
-            in: productIds
-          }
-        },
-        include: {
-          category: true,
-          shop: true
-        }
-      })
+      throw new BadRequestException('购物车为空。')
+    }
 
-      if (products.length !== productIds.length) {
+    const productIds = cart.items.map((item) => item.productId)
+    const products = await this.prisma.recipe.findMany({
+      where: {
+        id: {
+          in: productIds
+        }
+      },
+      include: {
+        category: true,
+        shop: true
+      }
+    })
+
+    if (products.length !== productIds.length) {
+      throw new NotFoundException('商品不存在。')
+    }
+
+    const productMap = new Map(products.map((product) => [product.id, product]))
+    let totalQuantity = 0
+    let totalAmount = 0
+
+    const orderItems = cart.items.map((item) => {
+      const product = productMap.get(item.productId)
+
+      if (!product) {
         throw new NotFoundException('商品不存在。')
       }
 
-      const productMap = new Map(products.map((product) => [product.id, product]))
-      let totalQuantity = 0
-      let totalAmount = 0
-
-      const orderItems = cart.items.map((item) => {
-        const product = productMap.get(item.productId)
-
-        if (!product) {
-          throw new NotFoundException('商品不存在。')
-        }
-
-        if (!product.isOnline) {
-          throw new BadRequestException(`商品“${product.name}”已下架。`)
-        }
-
-        this.ensureStock(product, item.quantity)
-
-        const lineAmount = product.price * item.quantity
-        totalQuantity += item.quantity
-        totalAmount += lineAmount
-
-        return {
-          productId: product.id,
-          categoryId: product.categoryId,
-          categoryName: product.category.name,
-          name: product.name,
-          badge: product.badge ?? null,
-          price: product.price,
-          quantity: item.quantity,
-          lineAmount,
-          thumbTone: product.thumbTone,
-          thumbAccent: product.thumbAccent
-        }
-      })
-
-      const firstProduct = products[0]
-
-      if (!firstProduct) {
-        throw new BadRequestException('购物车为空。')
+      if (!product.isOnline) {
+        throw new BadRequestException(`商品“${product.name}”已下架。`)
       }
 
-      const order = await tx.order.create({
+      this.ensureStock(product, item.quantity)
+
+      const lineAmount = product.price * item.quantity
+      totalQuantity += item.quantity
+      totalAmount += lineAmount
+
+      return {
+        productId: product.id,
+        categoryId: product.categoryId,
+        categoryName: product.category.name,
+        name: product.name,
+        badge: product.badge ?? null,
+        price: product.price,
+        quantity: item.quantity,
+        lineAmount,
+        thumbTone: product.thumbTone,
+        thumbAccent: product.thumbAccent
+      }
+    })
+
+    const firstCartProduct = productMap.get(cart.items[0].productId)
+
+    if (!firstCartProduct) {
+      throw new BadRequestException('购物车为空。')
+    }
+
+    const orderId = randomUUID()
+    const submittedAt = new Date()
+    const transactionOps: Prisma.PrismaPromise<unknown>[] = [
+      this.prisma.order.create({
         data: {
+          id: orderId,
           orderNo: this.buildOrderNo(),
           userId: currentUser.id,
-          shopId: firstProduct.shopId,
-          shopName: firstProduct.shop.name,
+          shopId: firstCartProduct.shopId,
+          shopName: firstCartProduct.shop.name,
           status: 'PENDING_PAYMENT',
           itemCount: orderItems.length,
           totalQuantity,
-          totalAmount,
-          items: {
-            create: orderItems
-          }
-        },
-        include: {
-          items: true
+          totalAmount
         }
       })
+    ]
 
-      for (const item of orderItems) {
-        await tx.recipe.update({
+    for (const item of orderItems) {
+      transactionOps.push(
+        this.prisma.orderItem.create({
+          data: {
+            orderId,
+            ...item
+          }
+        })
+      )
+    }
+
+    for (const item of orderItems) {
+      transactionOps.push(
+        this.prisma.recipe.update({
           where: {
             id: item.productId
           },
@@ -261,27 +276,50 @@ export class OrdersService {
             }
           }
         })
-      }
+      )
+    }
 
-      await tx.cartItem.deleteMany({
-        where: {
-          cartId: cart.id
-        }
-      })
+    for (const item of cart.items) {
+      transactionOps.push(
+        this.prisma.cartItem.delete({
+          where: {
+            id: item.id
+          }
+        })
+      )
+    }
 
-      await tx.cart.update({
+    transactionOps.push(
+      this.prisma.cart.update({
         where: {
           id: cart.id
         },
         data: {
           shopId: null,
-          lastOrderId: order.id,
-          lastSubmittedAt: new Date()
+          lastOrderId: orderId,
+          lastSubmittedAt: submittedAt
         }
       })
+    )
 
-      return order
+    await this.prisma.$transaction(transactionOps)
+
+    const created = await this.prisma.order.findUnique({
+      where: {
+        id: orderId
+      },
+      include: {
+        items: {
+          orderBy: {
+            createdAt: 'asc'
+          }
+        }
+      }
     })
+
+    if (!created) {
+      throw new NotFoundException('订单不存在。')
+    }
 
     return mapOrderDetail(created)
   }
