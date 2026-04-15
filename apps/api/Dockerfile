@@ -18,4 +18,4 @@ WORKDIR /app/apps/api
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "corepack pnpm prisma:migrate:deploy && node dist/main.js"]
+CMD ["node", "dist/main.js"]
