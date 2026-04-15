@@ -237,6 +237,7 @@ export class OrdersService {
           userId: currentUser.id,
           shopId: firstProduct.shopId,
           shopName: firstProduct.shop.name,
+          status: 'PENDING_PAYMENT',
           itemCount: orderItems.length,
           totalQuantity,
           totalAmount,
@@ -290,6 +291,14 @@ export class OrdersService {
 
     if (currentUser.role === 'end_user') {
       where.userId = currentUser.id
+    }
+
+    if (currentUser.role === 'merchant_admin') {
+      if (!currentUser.shopId) {
+        return []
+      }
+
+      where.shopId = currentUser.shopId
     }
 
     if (query.status) {
