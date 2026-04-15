@@ -2,7 +2,6 @@ import 'dotenv/config'
 import { Logger, ValidationPipe } from '@nestjs/common'
 import { NestFactory } from '@nestjs/core'
 import { AppModule } from './app.module'
-import { prepareDatabase } from './bootstrap/database-bootstrap'
 import { HttpExceptionFilter } from './common/http/http-exception.filter'
 
 const logger = new Logger('Bootstrap')
@@ -23,8 +22,6 @@ async function bootstrap() {
   const port = Number(process.env.PORT ?? 3000)
   const host = process.env.HOST ?? '0.0.0.0'
   const corsOrigins = parseCorsOrigins(process.env.CORS_ALLOW_ORIGINS)
-
-  await prepareDatabase(logger)
 
   const app = await NestFactory.create(AppModule, {
     logger:
