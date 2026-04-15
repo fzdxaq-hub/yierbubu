@@ -98,30 +98,28 @@ export class OrdersService {
   }
 
   private async restoreStock(tx: Prisma.TransactionClient, items: PrismaOrderItem[]) {
-    await Promise.all(
-      items.map(async (item) => {
-        const recipe = await tx.recipe.findUnique({
-          where: {
-            id: item.productId
-          }
-        })
-
-        if (!recipe) {
-          return
+    for (const item of items) {
+      const recipe = await tx.recipe.findUnique({
+        where: {
+          id: item.productId
         }
-
-        await tx.recipe.update({
-          where: {
-            id: item.productId
-          },
-          data: {
-            stock: {
-              increment: item.quantity
-            }
-          }
-        })
       })
-    )
+
+      if (!recipe) {
+        continue
+      }
+
+      await tx.recipe.update({
+        where: {
+          id: item.productId
+        },
+        data: {
+          stock: {
+            increment: item.quantity
+          }
+        }
+      })
+    }
   }
 
   private assertStatusTransition(order: PrismaOrderWithItems, nextStatus: OrderStatus) {
@@ -251,20 +249,18 @@ export class OrdersService {
         }
       })
 
-      await Promise.all(
-        orderItems.map((item) =>
-          tx.recipe.update({
-            where: {
-              id: item.productId
-            },
-            data: {
-              stock: {
-                decrement: item.quantity
-              }
+      for (const item of orderItems) {
+        await tx.recipe.update({
+          where: {
+            id: item.productId
+          },
+          data: {
+            stock: {
+              decrement: item.quantity
             }
-          })
-        )
-      )
+          }
+        })
+      }
 
       await tx.cartItem.deleteMany({
         where: {
