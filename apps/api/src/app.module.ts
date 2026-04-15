@@ -7,9 +7,19 @@ import { ProductsModule } from './modules/products/products.module'
 import { CartsModule } from './modules/carts/carts.module'
 import { OrdersModule } from './modules/orders/orders.module'
 import { AuthModule } from './modules/auth/auth.module'
+import { InternalModule } from './modules/internal/internal.module'
 
 @Module({
-  imports: [PrismaModule, AuthModule, ShopsModule, CategoriesModule, ProductsModule, CartsModule, OrdersModule],
+  imports: [
+    PrismaModule,
+    AuthModule,
+    ShopsModule,
+    CategoriesModule,
+    ProductsModule,
+    CartsModule,
+    OrdersModule,
+    InternalModule
+  ],
   controllers: [HealthController]
 })
 export class AppModule {}
